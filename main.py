@@ -1,6 +1,8 @@
 import csv
+import itertools
 import sys
 import networkx as nx
+from itertools import combinations
 
 
 def get_data(file_path, nrow=1000000000, read_col=1, min_size=5):
@@ -18,68 +20,74 @@ def get_data(file_path, nrow=1000000000, read_col=1, min_size=5):
                     sequence_collection[seq_len].add(aa_seq)
     return sequence_collection
 
+# create a network graph
+def get_graph(sequence_collection, gap=False, min_size=5):
 
-def no_gap(seq_len_table):
+    def get_edges(sequence_set_lis, edge_weight):
+        return [(u, v, edge_weight) for seq_set in sequence_set_lis for u, v in
+                itertools.combinations(seq_set, 2)]
+
+    def get_gaps(minus_one_seq, subs_table, gap_i):
+        gaps = minus_one_seq.intersection(subs_table.keys())
+        return [(v, u, gap_i) for u in gaps for v in subs_table[u]]
+
+    G = nx.Graph()
+    for l in sequence_collection.keys():
+        # s_dict = []
+        # g_dict = []
+
+        for i, distance_one_sequences in minus_one_subsequences(sequence_collection[l], l):
+            # cluster sequences by a single substitution and optional single gap
+            edge_list = get_edges(distance_one_sequences.values(), i)
+            # s_dict.append(len(edge_list))
+            gap_list = []
+
+            if l - 1 in sequence_collection and gap:
+                gap_list = get_gaps(sequence_collection[l - 1], distance_one_sequences, i)
+                edge_list.extend(gap_list)
+            # g_dict.append(len(gap_list))
+            G.add_weighted_edges_from(edge_list)
+
+
+        # print(l, g_dict)
+
+
+
+    return G
+
+
+def get_edges(sequence_set_lis):
+    return [(u, v) for seq_set in sequence_set_lis for u, v in itertools.combinations(seq_set, 2)]
+
+
+def minus_one_subsequences(same_length_sequences, sequence_length):
     # substring of a string without the char in index i
     def subsequence(s, i):
         return s[:i] + s[i + 1:]
 
-    # dictionary of all the subsequences as a key to the full sequence
-    def table_i(sequences, sub_i):
+    def subsequences_table(sequences, sub_seqs):
         subs_table = dict()
-        for sub_seq, full_seq in zip([subsequence(seq, sub_i) for seq in sequences], sequences):
+        for sub_seq, full_seq in zip(sub_seqs, sequences):
             subs_table.setdefault(sub_seq, set()).add(full_seq)
         return subs_table
 
-    # all buckets contain more than one sequence
-    def more_than_one(subs_table):
-        return [sub_seq for sub_seq in subs_table if len(subs_table[sub_seq]) > 1]
-
-    # loop in descending order of dataset keys
-    for l in range(len(seq_len_table), 0, -1):
-        print("size:", l)
-        for i in range(l):
-            if seq_len_table[l]:
-                Tli = table_i(seq_len_table[l], i)
-                print("table size:", len(more_than_one(Tli)))
-    return []
+    for i in range(sequence_length):
+        subs = [subsequence(seq, i) for seq in same_length_sequences]
+        subs_table = subsequences_table(same_length_sequences, subs)
+        yield i, subs_table
 
 
-def main(input_path, output_path, no_gap=True, none_or_2_gaps=True, up_to_1_gap=True, up_to_2_gaps=True):
-    # substring of a string without the char in index i
-    def subsequence(s, i):
-        return s[:i] + s[i + 1:]
-
-    # dictionary of all the subsequences as a key to the full sequence
-    def table_i(sequences, sub_i):
-        subs_table = dict()
-        for sub_seq, full_seq in zip([subsequence(seq, sub_i) for seq in sequences], sequences):
-            subs_table.setdefault(sub_seq, set()).add(full_seq)
-        return subs_table
-
-    # all buckets contain more than one sequence
-    def more_than_one(subs_table):
-        return [sub_seq for sub_seq in subs_table if len(subs_table[sub_seq]) > 1]
-
+def main(input_path, output_path="output3.edgelist.gz"):
+    # read datasets
     dataset = get_data(input_path, min_size=5)
+    # create a network graph
+    G = get_graph(dataset, gap=True)
+    # print(*G.edges(data=True), sep='\n')
+    # write graph to file
 
-    # loop in descending order of dataset keys
-    for l in dataset.keys():
-        for i in range(l):
-            # One Substitution
-            Tli = table_i(dataset[l], i)
-            # One Gap
-            if l-1 in dataset:
-                gap_sequences = dataset[l - 1].intersection(Tli.keys())
-                for gap_seq in gap_sequences:
-                    Tli[gap_seq].add(gap_seq)
-
-            cliques = more_than_one(Tli)
-
-            print("size:", l, "i:", i, "cliques:", len(cliques))
-
+    nx.write_edgelist(G, output_path, data=["mismatch", "gap"])
 
 if __name__ == '__main__':
     i_path = sys.argv[1]
     o_path = sys.argv[2]
-    main(i_path, o_path)
+    main(i_path)
