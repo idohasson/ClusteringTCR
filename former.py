@@ -67,13 +67,30 @@ def main2(i_path):
                 #     writer.writerows(clusters)
                 #
 
+
 def main3(i_path):
+    all_sequences = [[] for _ in range(100)]
+    # TODO: efficient way to read the file
     with open(i_path, "r") as csvfile:
         data_reader = csv.reader(csvfile)
         next(data_reader)  # the header row
-        all_sequences = [list(row[1]) for row in data_reader]
-        i = 3
-        # crate a subsequence by removing th i caracter from the sequence
+        for row in data_reader:
+            all_sequences[len(row[1])].append(list(row[1]))
+
+    # crate a subsequence by removing th i character from the sequence
+    all_clusters = []
+    for l, sequences in enumerate(all_sequences[6:], start=6):
+        if sequences:
+            range_l = range(l)
+            for i in range_l:
+                # TODO efficient way to create the subsequence
+                sub_seq = ["".join(seq[j] for j in range_l if i != j) for seq in sequences]
+                sub_li_table = dict.fromkeys(sub_seq, [])
+                for sub, seq in zip(sub_seq, sequences):
+                    sub_li_table[sub] += [seq]
+
+                # filter out the subsequences that have more than one sequence
+                all_clusters.append([seq_li for sub_seq, seq_li in sub_li_table.items() if len(seq_li) > 1])
 
 
 if __name__ == '__main__':
@@ -81,9 +98,6 @@ if __name__ == '__main__':
     o_path2 = sys.argv[2]
     o_path3 = sys.argv[3]
     # check run time
-    # start_time = time.time()
-    # main(i_path)
-    # print("--- %s seconds ---" % (time.time() - start_time))
     start_time = time.time()
     main3(i_path1)
     print("--- %s seconds ---" % (time.time() - start_time))
